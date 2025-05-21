@@ -273,4 +273,37 @@
   )
 )
 
+;; Enhanced voting function that considers delegated votes
+(define-public (vote-with-delegation (proposal-id uint) (vote bool))
+  (let (
+    (voter tx-sender)
+    (vote-weight (+ u1 (default-to u0 (map-get? delegation-count voter))))
+    (vote-key { proposal-id: proposal-id, voter: voter })
+  )
+    ;; Check if voter is a member
+    (asserts! (is-member voter) ERR_NOT_MEMBER)
+    
+    ;; Check if proposal exists
+    (asserts! (is-some (map-get? proposals proposal-id)) ERR_PROPOSAL_NOT_FOUND)
+    
+    ;; Check if voting is still active
+    (asserts! (is-voting-active proposal-id) ERR_VOTING_CLOSED)
+    
+    ;; Check if member has already voted
+    (asserts! (is-none (map-get? votes vote-key)) ERR_ALREADY_VOTED)
+    
+    ;; Record the vote
+    (map-set votes vote-key vote)
+    
+    ;; Update the vote count with weighted votes
+    (let ((proposal (unwrap-panic (map-get? proposals proposal-id))))
+      (if vote
+        (map-set proposals proposal-id (merge proposal { yes-votes: (+ (get yes-votes proposal) vote-weight) }))
+        (map-set proposals proposal-id (merge proposal { no-votes: (+ (get no-votes proposal) vote-weight) }))
+      )
+    )
+    
+    (ok true)
+  )
+)
 
